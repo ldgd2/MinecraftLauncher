@@ -1,0 +1,9 @@
+{
+    "username": "Lider777",
+    "ram_mb": 5120,
+    "java_path": "",
+    "jvm_arguments": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M",
+    "minecraft_dir": "C:\\Users\\ldgd2\\AppData\\Roaming\\.custom_mc_launcher",
+    "selected_version": "fabric-loader-0.18.4-1.20.1",
+    "selected_type": "Vanilla"
+}

@@ -1,0 +1,20 @@
+# Configuración de usuario
+settings.json
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos Virtuales
+venv/
+.env
+
+# PyInstaller / Construcción
+build/
+dist/
+*.spec
+
+# Editores de código
+.idea/
+.vscode/
