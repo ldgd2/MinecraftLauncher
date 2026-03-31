@@ -41,7 +41,7 @@ def _load_env():
 _ENV = _load_env()
 
 # Client ID: .env > os.environ > fallback
-CLIENT_ID     = _ENV.get("AZURE_CLIENT_ID") or os.environ.get("AZURE_CLIENT_ID") or "ca6c2dc0-164d-4be0-be4a-96f89a01ac12"
+CLIENT_ID     = _ENV.get("AZURE_CLIENT_ID") or os.environ.get("AZURE_CLIENT_ID") or "null"
 REDIRECT_URI  = _ENV.get("AZURE_REDIRECT_URI") or os.environ.get("AZURE_REDIRECT_URI") or "http://localhost:3000/callback"
 import subprocess
 
