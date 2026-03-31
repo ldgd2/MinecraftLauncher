@@ -1,153 +1,159 @@
-import customtkinter as ctk
-from PIL import Image
+"""
+Minecraft Launcher - App Entrypoint
+Wires up all views with smooth slide transitions.
+"""
+import tkinter as tk
 import os
-from core.paths import get_resource_path
-from ui.views.home import HomeView
-from ui.views.settings import SettingsView
-from ui.views.downloads import DownloadsView
-from core.launcher import init_discord_rpc
 
-class LauncherApp(ctk.CTk):
+from config.manager import config
+from ui.theme import Colors, Assets, mc_font, load_minecraft_font
+
+# Views
+from ui.views.login     import LoginView
+from ui.views.home      import HomeView
+from ui.views.settings  import SettingsView
+from ui.views.skins     import SkinsView
+from ui.views.downloads import DownloadsView
+
+
+class LauncherApp(tk.Tk):
+    """Main launcher window — a thin shell that hosts the view stack."""
+
     def __init__(self):
         super().__init__()
 
         self.title("Minecraft Launcher")
-        self.geometry("900x600")
-        self.minsize(800, 500)
-        
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        self.geometry("1100x700")
+        self.minsize(900, 600)
+        self.configure(bg=Colors.DARK)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        self.bg_image_path = get_resource_path(os.path.join("ui", "assets", "bg.png"))
-        if os.path.exists(self.bg_image_path):
-            img = Image.open(self.bg_image_path)
-            self.bg_ctk_image = ctk.CTkImage(light_image=img, dark_image=img, size=(900, 600))
-            self.bg_label = ctk.CTkLabel(self, image=self.bg_ctk_image, text="")
-            self.bg_label.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
-            self.bind("<Configure>", self._resize_bg)
+        # Load Minecraft font once
+        load_minecraft_font()
 
-        self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0, fg_color="#181818")
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+        # Register font with tkinter if TTF file exists
+        self._try_register_font()
 
-        self.logo_label = ctk.CTkLabel(
-            self.sidebar_frame, 
-            text="MC Launcher", 
-            font=ctk.CTkFont(family="Inter", size=24, weight="bold"),
-            text_color="#00A859"
-        )
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 30))
+        # Full-window container
+        self.container = tk.Frame(self, bg=Colors.DARK)
+        self.container.pack(fill="both", expand=True)
 
-        icon_size = (20, 20)
-        self.home_icon = ctk.CTkImage(Image.open(get_resource_path(os.path.join("ui", "assets", "icons", "home.png"))), size=icon_size)
-        self.settings_icon = ctk.CTkImage(Image.open(get_resource_path(os.path.join("ui", "assets", "icons", "settings.png"))), size=icon_size)
-        self.downloads_icon = ctk.CTkImage(Image.open(get_resource_path(os.path.join("ui", "assets", "icons", "downloads.png"))), size=icon_size)
+        # Instantiate all views (hidden by default)
+        self.login_view     = LoginView(    self.container, app=self, on_login_success=self.on_login_success)
+        self.home_view      = HomeView(     self.container, app=self)
+        self.settings_view  = SettingsView( self.container, app=self)
+        self.skins_view     = SkinsView(    self.container, app=self)
+        self.downloads_view = DownloadsView(self.container, app=self,
+                                             on_download_complete=self.home_view.sync_launch_settings)
 
-        self.home_button = ctk.CTkButton(
-            self.sidebar_frame, 
-            corner_radius=0, 
-            height=50, 
-            border_spacing=10, 
-            text=" Home",
-            image=self.home_icon,
-            fg_color="transparent", 
-            text_color=("gray10", "gray90"), 
-            hover_color=("gray70", "gray30"),
-            anchor="w", 
-            command=self.show_home_view
-        )
-        self.home_button.grid(row=1, column=0, sticky="ew")
+        self.current_view: tk.Frame | None = None
 
-        self.settings_button = ctk.CTkButton(
-            self.sidebar_frame, 
-            corner_radius=0, 
-            height=50, 
-            border_spacing=10, 
-            text=" Settings",
-            image=self.settings_icon,
-            fg_color="transparent", 
-            text_color=("gray10", "gray90"), 
-            hover_color=("gray70", "gray30"),
-            anchor="w", 
-            command=self.show_settings_view
-        )
-        self.settings_button.grid(row=2, column=0, sticky="ew")
+        # Start on the right screen
+        if config.get("logged_in"):
+            self.show_home_view()
+        else:
+            self.show_login_view()
 
-        self.downloads_button = ctk.CTkButton(
-            self.sidebar_frame, 
-            corner_radius=0, 
-            height=50, 
-            border_spacing=10, 
-            text=" Downloads",
-            image=self.downloads_icon,
-            fg_color="transparent", 
-            text_color=("gray10", "gray90"), 
-            hover_color=("gray70", "gray30"),
-            anchor="w", 
-            command=self.show_downloads_view
-        )
-        self.downloads_button.grid(row=3, column=0, sticky="ew")
+        # Optional: Discord RPC (non-fatal)
+        try:
+            from core.launcher import init_discord_rpc
+            init_discord_rpc()
+        except Exception:
+            pass
 
-        self.main_container = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_container.grid(row=0, column=1, sticky="nsew")
-        self.main_container.grid_rowconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(0, weight=1)
+    # ── Font registration ─────────────────────────────────────────────────────
 
-        self.home_view = HomeView(self.main_container)
-        self.settings_view = SettingsView(self.main_container)
-        self.downloads_view = DownloadsView(self.main_container, on_download_complete=self.home_view.fetch_versions)
-
-        self.current_view = None
-        self.show_home_view()
-
-        init_discord_rpc()
-
-    def select_sidebar_button(self, name):
-        self.home_button.configure(fg_color=("gray75", "gray25") if name == "home" else "transparent")
-        self.settings_button.configure(fg_color=("gray75", "gray25") if name == "settings" else "transparent")
-        self.downloads_button.configure(fg_color=("gray75", "gray25") if name == "downloads" else "transparent")
-
-    def _resize_bg(self, event):
-        if event.widget == self and hasattr(self, 'bg_ctk_image'):
-            w, h = self.winfo_width(), self.winfo_height()
-            if w > 10 and h > 10:
-                self.bg_ctk_image.configure(size=(w, h))
-
-    def show_view(self, view, name):
-        if self.current_view == view:
+    def _try_register_font(self):
+        """Best-effort registration of Minecraft.ttf with tkinter."""
+        font_path = Assets.FONT_MC
+        if not os.path.exists(font_path):
             return
-            
-        prev_view = self.current_view
+        try:
+            # pyglet-based registration (works on Windows)
+            import pyglet
+            pyglet.font.add_file(font_path)
+        except Exception:
+            pass
+        try:
+            # Windows GDI registration via ctypes
+            import ctypes
+            ctypes.windll.gdi32.AddFontResourceW(font_path)
+        except Exception:
+            pass
+
+    # ── View transitions ──────────────────────────────────────────────────────
+
+    def _place(self, view: tk.Frame):
+        view.place(relx=0, rely=0, relwidth=1, relheight=1)
+        view.lift()
+
+    def _hide(self, view: tk.Frame | None):
+        if view and view.winfo_exists():
+            view.place_forget()
+
+    def show_view(self, view: tk.Frame, name: str):
+        if self.current_view is view:
+            return
+        prev = self.current_view
         self.current_view = view
-        
-        view.place(relx=1.0, rely=0, relwidth=1.0, relheight=1.0)
-        view.lift() # Bring to front
-        
-        self._animate_slide(view, prev_view)
-        self.select_sidebar_button(name)
-        
-        if name == "home" and hasattr(self.settings_view, 'inputs'):
-            self.home_view.username_input.set(self.settings_view.inputs["username"].get())
-        elif name == "settings" and hasattr(self.home_view, 'username_input'):
-            self.settings_view.inputs["username"].set(self.home_view.username_input.get())
 
-    def _animate_slide(self, view, prev_view, step=0.0):
+        # Slide-in animation
+        view.place(relx=1.0, rely=0, relwidth=1, relheight=1)
+        view.lift()
+        self._slide(view, prev)
+
+        # Sync live data for the target view
+        if name == "home":
+            self.home_view.sync_launch_settings()
+
+    def _slide(self, view: tk.Frame, prev: tk.Frame | None, step: float = 0.0):
         if step >= 1.0:
-            view.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
-            if prev_view:
-                prev_view.place_forget()
+            self._place(view)
+            self._hide(prev)
             return
+        x = (1.0 - step) ** 4          # eased
+        view.place(relx=x, rely=0, relwidth=1, relheight=1)
+        self.after(10, lambda: self._slide(view, prev, step + 0.06))
 
-        x = (1.0 - step) ** 3
-        view.place(relx=x, rely=0, relwidth=1.0, relheight=1.0)
-        
-        self.after(5, lambda: self._animate_slide(view, prev_view, step + 0.02))
+    # ── Named shortcuts ───────────────────────────────────────────────────────
+
+    def show_login_view(self):
+        self.current_view = self.login_view
+        self._place(self.login_view)
 
     def show_home_view(self):
         self.show_view(self.home_view, "home")
 
-    def show_settings_view(self):
+    def show_settings_view(self, **_):
         self.show_view(self.settings_view, "settings")
 
-    def show_downloads_view(self):
+    def show_skins_view(self, **_):
+        self.show_view(self.skins_view, "skins")
+        # Refresh preview after slide-in
+        self.after(400, lambda: self.skins_view.on_show() if hasattr(self.skins_view, 'on_show') else None)
+
+    def show_downloads_view(self, **_):
         self.show_view(self.downloads_view, "downloads")
+
+    # ── Auth callbacks ────────────────────────────────────────────────────────
+
+    def on_login_success(self):
+        self._hide(self.login_view)
+        self.home_view.sync_launch_settings()
+        self.current_view = None
+        self.show_home_view()
+
+    def logout(self):
+        config.set("logged_in",  False)
+        config.set("username",   "")
+        config.set("uuid",       "")
+        config.set("auth_token", "")
+        config.set("auth_type",  "nopremium")
+        self._hide(self.home_view)
+        self.current_view = None
+        self.show_login_view()
+
+    # ── Window events ─────────────────────────────────────────────────────────
+
+    def on_closing(self):
+        self.destroy()

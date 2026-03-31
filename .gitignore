@@ -1,20 +1,18 @@
-# Configuración de usuario
-settings.json
-
-# Caché de Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Entornos Virtuales
-venv/
 .env
+*.pyc
+__pycache__/
+venv/
+data/skin_cache/
+*.log
+launch_command.log
+settings.json
+empaquetar.py
 
-# PyInstaller / Construcción
+# PyInstaller build artifacts
 build/
 dist/
-*.spec
 
-# Editores de código
-.idea/
-.vscode/
+*.exe
+
+
+
